@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -13,8 +13,11 @@ import {
 	Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ChatScreen from './chat';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import ChatScreen from '@/app/ChatScreen';
+import { useNotifications } from '@/contexts/NotificationContext';
+import NotificationScreen from '@/screens/NotificationScreen';
 
 interface FavoriteItemProps {
 	title: string;
@@ -46,6 +49,7 @@ const FavoriteItem = ({ title, icon, subtitle }: FavoriteItemProps) => (
 export default function HomeScreen() {
 	const [isChatOpen, setIsChatOpen] = useState(false);
 	const [inputText, setInputText] = useState('');
+	const { unreadCount } = useNotifications();
 	// Separate animations for native and JS drivers
 	const inputWidth = useRef(new Animated.Value(0)).current;
 	const iconsTranslateX = useRef(new Animated.Value(0)).current;
@@ -55,28 +59,26 @@ export default function HomeScreen() {
 	).current;
 	const modalOpacity = useRef(new Animated.Value(0)).current;
 	const modalHeight = Dimensions.get('window').height - 90;
-	const router = useRouter();
 
-	const openChat = () => {
+	const floatingButtonScale = useRef(new Animated.Value(1)).current;
+
+	useEffect(() => {
+		Animated.timing(floatingButtonScale, {
+			toValue: isChatOpen ? 0 : 1,
+			duration: 200,
+			useNativeDriver: true,
+		}).start();
+	}, [isChatOpen]);
+
+	useEffect(() => {
+		if (isChatOpen) {
+			Keyboard.dismiss();
+		}
+	}, [isChatOpen]);
+
+	const openChat = useCallback(() => {
 		setIsChatOpen(true);
 		Animated.parallel([
-			// JS driven animations
-			Animated.timing(inputWidth, {
-				toValue: 1,
-				duration: 200,
-				useNativeDriver: false,
-			}),
-			// Native driven animations
-			Animated.timing(iconsTranslateX, {
-				toValue: -100,
-				duration: 200,
-				useNativeDriver: true,
-			}),
-			Animated.timing(iconsOpacity, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: true,
-			}),
 			Animated.timing(modalTranslateY, {
 				toValue: 0,
 				duration: 300,
@@ -88,27 +90,10 @@ export default function HomeScreen() {
 				useNativeDriver: true,
 			}),
 		]).start();
-	};
+	}, [modalTranslateY, modalOpacity]);
 
-	const closeChat = () => {
+	const closeChat = useCallback(() => {
 		Animated.parallel([
-			// JS driven animations
-			Animated.timing(inputWidth, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: false,
-			}),
-			// Native driven animations
-			Animated.timing(iconsTranslateX, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: true,
-			}),
-			Animated.timing(iconsOpacity, {
-				toValue: 1,
-				duration: 200,
-				useNativeDriver: true,
-			}),
 			Animated.timing(modalTranslateY, {
 				toValue: modalHeight,
 				duration: 300,
@@ -122,7 +107,7 @@ export default function HomeScreen() {
 		]).start(() => {
 			setIsChatOpen(false);
 		});
-	};
+	}, [modalHeight, modalTranslateY, modalOpacity]);
 
 	const interpolatedInputWidth = inputWidth.interpolate({
 		inputRange: [0, 1],
@@ -149,10 +134,17 @@ export default function HomeScreen() {
 							color="black"
 						/>
 					</TouchableOpacity>
-					<TouchableOpacity style={styles.headerButton}>
-						<View style={styles.notificationBadge}>
-							<Text style={styles.notificationText}>1</Text>
-						</View>
+					<TouchableOpacity
+						style={styles.headerButton}
+						onPress={() => router.push('/(tabs)/notifications')}
+					>
+						{unreadCount > 0 && (
+							<View style={styles.notificationBadge}>
+								<Text style={styles.notificationText}>
+									{unreadCount > 99 ? '99+' : unreadCount}
+								</Text>
+							</View>
+						)}
 						<Ionicons
 							name="notifications-outline"
 							size={24}
@@ -277,74 +269,36 @@ export default function HomeScreen() {
 						</View>
 					</View>
 				</View>
-
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Shop And More</Text>
-					{/* Add shop items here */}
-				</View>
 			</ScrollView>
 
-			<View style={styles.bottomBar}>
-				<Animated.View
-					style={[
-						styles.bottomBarIcons,
-						{
-							transform: [{ translateX: iconsTranslateX }],
-							opacity: iconsOpacity,
-						},
-					]}
-					pointerEvents={isChatOpen ? 'none' : 'auto'}
-				>
-					<TouchableOpacity style={styles.bottomBarItem}>
-						<Ionicons
-							name="home"
-							size={24}
-							color="#2196F3"
-						/>
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.bottomBarItem}>
-						<Ionicons
-							name="mic-outline"
-							size={24}
-							color="#666"
-						/>
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.bottomBarItem}>
-						<Ionicons
-							name="menu-outline"
-							size={24}
-							color="#666"
-						/>
-					</TouchableOpacity>
-				</Animated.View>
+			<Animated.View
+				style={[
+					styles.floatingButton,
+					{
+						transform: [{ scale: floatingButtonScale }],
+						opacity: floatingButtonScale,
+					},
+				]}
+			>
 				<TouchableOpacity
-					activeOpacity={1}
-					style={styles.bottomBarInputContainer}
+					onPress={openChat}
+					activeOpacity={0.9}
+					style={styles.floatingButtonTouchable}
 				>
-					<Animated.View
-						style={[
-							styles.bottomBarInput,
-							{
-								width: interpolatedInputWidth,
-							},
-						]}
+					<LinearGradient
+						colors={['#00A0B4', '#0078FF']}
+						style={styles.floatingButtonGradient}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 0 }}
 					>
-						<TextInput
-							style={styles.bottomBarInputText}
-							placeholder="Message Kairos..."
-							placeholderTextColor="#666"
-							value={inputText}
-							onChangeText={setInputText}
-							onFocus={handleInputFocus}
-						/>
 						<Ionicons
 							name="mic"
-							size={20}
-							color="#666"
+							size={28}
+							color="#fff"
 						/>
-					</Animated.View>
+					</LinearGradient>
 				</TouchableOpacity>
-			</View>
+			</Animated.View>
 
 			<Animated.View
 				style={[
@@ -493,8 +447,7 @@ const styles = StyleSheet.create({
 	bottomBar: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		padding: 16,
-		borderTopWidth: 1,
+		padding: 8,
 		borderTopColor: '#eee',
 		backgroundColor: '#fff',
 		overflow: 'hidden',
@@ -526,6 +479,36 @@ const styles = StyleSheet.create({
 		flex: 1,
 		color: '#333',
 		fontSize: 16,
+	},
+	floatingButton: {
+		position: 'absolute',
+		bottom: 24,
+		right: 24,
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		elevation: 5,
+		zIndex: 1,
+	},
+	floatingButtonGradient: {
+		width: '100%',
+		height: '100%',
+		borderRadius: 32,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	floatingButtonTouchable: {
+		width: '100%',
+		height: '100%',
+		borderRadius: 32,
+		overflow: 'hidden',
 	},
 	chatModal: {
 		position: 'absolute',
