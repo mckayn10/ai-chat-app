@@ -125,7 +125,20 @@ export default function ChatScreen({ onClose }: ChatScreenProps) {
 	useEffect(() => {
 		const initAgent = async () => {
 			const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
-			if (apiKey) {
+			console.log('API Key available:', !!apiKey);
+
+			if (!apiKey) {
+				console.error('API key is missing');
+				setMessages([
+					{
+						text: 'Error: API key not configured. Please check your environment variables.',
+						isUser: false,
+					},
+				]);
+				return;
+			}
+
+			try {
 				agent.current = new ContactManagementAgent(apiKey);
 				setMessages([
 					{
@@ -133,10 +146,11 @@ export default function ChatScreen({ onClose }: ChatScreenProps) {
 						isUser: false,
 					},
 				]);
-			} else {
+			} catch (error) {
+				console.error('Error initializing agent:', error);
 				setMessages([
 					{
-						text: 'Error: API key not configured.',
+						text: 'Error: Failed to initialize AI service. Please try again later.',
 						isUser: false,
 					},
 				]);
@@ -292,7 +306,16 @@ export default function ChatScreen({ onClose }: ChatScreenProps) {
 										end={{ x: 1, y: 0 }}
 									>
 										<Text style={styles.messageText}>
-											{message.text}
+											{message.text
+												.split('\n')
+												.map((line, i, arr) => (
+													<Text key={i}>
+														{line}
+														{i < arr.length - 1
+															? '\n'
+															: ''}
+													</Text>
+												))}
 										</Text>
 									</LinearGradient>
 								)}
@@ -402,6 +425,7 @@ const styles = StyleSheet.create({
 		padding: 12,
 		borderRadius: 20,
 		borderBottomLeftRadius: 4,
+		flexDirection: 'column',
 	},
 	userMessage: {
 		backgroundColor: '#f0f0f0',
@@ -411,6 +435,8 @@ const styles = StyleSheet.create({
 	messageText: {
 		color: '#fff',
 		fontSize: 16,
+		lineHeight: 24,
+		flexShrink: 1,
 	},
 	userMessageText: {
 		color: '#000',

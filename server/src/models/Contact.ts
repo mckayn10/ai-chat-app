@@ -103,4 +103,24 @@ export class ContactModel {
 
     return result.rows[0] || null;
   }
+
+  static async findByName(userId: number, firstName: string, lastName?: string): Promise<Contact[]> {
+    let query = `
+      SELECT id, user_id as "userId", first_name as "firstName", last_name as "lastName",
+             email, phone, notes, created_at as "createdAt", updated_at as "updatedAt"
+      FROM contacts
+      WHERE user_id = $1 AND LOWER(first_name) = LOWER($2)
+    `;
+    const params = [userId, firstName];
+
+    if (lastName) {
+      query += ` AND LOWER(last_name) = LOWER($3)`;
+      params.push(lastName);
+    }
+
+    query += ` ORDER BY first_name, last_name`;
+
+    const result = await pool.query(query, params);
+    return result.rows;
+  }
 } 

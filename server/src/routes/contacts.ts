@@ -88,4 +88,26 @@ router.delete('/:id', auth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Find contacts by name
+router.get('/search', auth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { firstName, lastName } = req.query;
+    
+    if (!firstName) {
+      return res.status(400).json({ error: 'First name is required' });
+    }
+
+    const contacts = await ContactModel.findByName(
+      req.user!.id,
+      firstName as string,
+      lastName as string
+    );
+
+    res.json(contacts);
+  } catch (error) {
+    console.error('Error searching contacts:', error);
+    res.status(500).json({ error: 'Failed to search contacts' });
+  }
+});
+
 export default router; 
